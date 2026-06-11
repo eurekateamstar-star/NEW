@@ -143,17 +143,20 @@ service firebase.storage {
             </ul>
         </li>
         <li>建立完成後，你會得到一串 <span class="highlight">LIFF ID</span>（格式大約是 1234567890-abcdefg）。<b>請將這串 ID 複製下來備用</b>。</li>
+        <li style="color: #d90429; font-weight: bold;">【重要設定】點擊畫面上方的「LIFF」頁籤回到列表，往下捲動到底部，找到 <code>shareTargetPicker</code> 的開關，將它 開啟 (變成綠色)。這能讓系統發送漂亮的圖文小卡到群組！</li>
     </ol>
 
     <h2>📍 步驟三：修改原始碼 (將系統換成您的設定)</h2>
-    <p>請將本手冊最下方的「附錄：系統完整程式碼」複製，貼到您電腦的「記事本」中，並修改以下兩個地方：</p>
+    <p>請將本手冊最下方的「附錄：系統完整程式碼」複製，貼到您電腦的「記事本」中，並修改以下三個地方：</p>
     <ol>
         <li><b>替換資料庫金鑰：</b><br>
             用 <code>Ctrl+F</code> 搜尋 <code>firebaseConfig</code>，將裡面的內容替換成您在 <b>步驟一 (第 5 點)</b> 複製下來的專屬金鑰。<br>
-            <small style="color:#d90429;">(請確保引號跟逗號的格式不要不小心刪掉了)</small>
         </li>
         <li><b>替換 LIFF ID：</b><br>
             用 <code>Ctrl+F</code> 搜尋 <code>liffId:</code>，替換成您在 <b>步驟二 (第 5 點)</b> 拿到的 ID。
+        </li>
+        <li><b>替換分享卡片的網址：</b><br>
+            用 <code>Ctrl+F</code> 搜尋 <code>uri: "https://liff.line.me/</code>，把後面的 ID 也換成您專屬的 LIFF ID。這樣別人才點的進來您的系統。
         </li>
     </ol>
     <p>修改完成後，請將記事本<b>另存新檔</b>，檔名命名為 <b><span class="inline-code">index.html</span></b>，檔案類型選擇「所有檔案」，編碼選擇「UTF-8」。</p>
@@ -203,7 +206,15 @@ service firebase.storage {
 &lt;head&gt;
     &lt;meta charset="UTF-8"&gt;
     &lt;meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"&gt;
-    &lt;title&gt;工廠火災安全管理小幫手&lt;/title&gt;
+    &lt;title&gt;🚒 工廠火災安全管理小幫手&lt;/title&gt;
+    
+    &lt;!-- 👇👇 加入這段讓 LINE 網址變成圖卡 👇👇 --&gt;
+    &lt;meta property="og:title" content="🚒 工廠火災安全管理小幫手"&gt;
+    &lt;meta property="og:description" content="點擊此處開啟看板，進行人員管制、部署回報與歷史紀錄查詢。"&gt;
+    &lt;meta property="og:image" content="https://i.ibb.co/8gNWWyN9/Group-of-firefighters-scaled-1.jpg"&gt;
+    &lt;meta property="og:type" content="website"&gt;
+    &lt;!-- 👆👆 加入這段讓 LINE 網址變成圖卡 👆👆 --&gt;
+
     &lt;style&gt;
         :root {
             --line-green: #06C755; --bg-gray: #F4F4F4; --border-color: #EBEBEB;
@@ -544,9 +555,15 @@ service firebase.storage {
                 &lt;/div&gt;
             &lt;/div&gt;
             &lt;!-- 容器結束 --&gt;
+
+            &lt;div class="section-title" style="margin-top: 24px;"&gt;系統分享與邀請&lt;/div&gt;
+            &lt;div class="card" style="background: transparent; box-shadow: none; padding: 0;"&gt;
+                &lt;button class="btn" id="btn-share-system" style="background-color: #023e8a; color: #fff; margin-top: 0;"&gt;📢 發送系統圖文小卡到群組&lt;/button&gt;
+            &lt;/div&gt;
+
         &lt;/div&gt;
     &lt;/div&gt;
-
+            
     &lt;!-- ================= 彈出視窗區 (全域覆蓋) ================= --&gt;
     &lt;div id="standby-modal" class="modal"&gt;
         &lt;div class="modal-box" style="border-color: var(--neon-gold); max-width: 480px;"&gt;
@@ -592,15 +609,15 @@ service firebase.storage {
     &lt;script type="module"&gt;
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, doc, onSnapshot, collection, query, where, setDoc, deleteDoc, serverTimestamp, getDoc, getDocs, addDoc, limit, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
         const firebaseConfig = { 
-            apiKey: "AIzaSyD9oJirgoJCTU7h-ODfSpfwC80E5fqze2A", 
-            authDomain: "clawone-6445c.firebaseapp.com", 
-            projectId: "clawone-6445c", 
-            storageBucket: "clawone-6445c.firebasestorage.app", 
-            messagingSenderId: "945236029933", 
-            appId: "1:945236029933:web:f93ffb9e6f8b41aebd37e4" 
+            apiKey: "請填入您的API_KEY", 
+            authDomain: "請填入您的AUTH_DOMAIN", 
+            projectId: "請填入您的PROJECT_ID", 
+            storageBucket: "請填入您的STORAGE_BUCKET", 
+            messagingSenderId: "請填入您的SENDER_ID", 
+            appId: "請填入您的APP_ID" 
         };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -622,14 +639,9 @@ service firebase.storage {
         };
 
         const fireData = {
-            "第一大隊": ["莒光", "新板", "板橋", "大觀", "海山", "民生", "溪崑"],
-            "第二大隊": ["五工", "裕民", "福營", "新莊", "中港", "頭前", "五股", "更寮", "泰山", "林口", "文化"],
-            "第三大隊": ["三重", "鷺江", "蘆洲", "重陽", "二重", "八里", "龍源", "淡水", "竹圍", "三芝", "滬尾"],
-            "第四大隊": ["深坑", "新店", "直潭", "安康", "安和", "石碇", "坪林", "雪山", "烏來"],
-            "第五大隊": ["三峽", "隆恩", "土城", "清水", "頂埔", "樹林", "樹潭", "柑園", "鶯歌", "鳳鳴"],
-            "第六大隊": ["社后", "汐止", "長青", "橫科", "瑞芳", "瑞亭", "九份", "金山", "石門", "萬里", "雙溪", "貢寮", "平溪"],
-            "第七大隊": ["永和", "永利", "永平", "中和", "員山", "南勢", "國光", "秀山"],
-            "特搜大隊": ["南雅", "慈福", "德音", "秀峰", "大埔"]
+            "第一大隊": ["中山", "中正", "信義"],
+            "第二大隊": ["大安", "松山"]
+            // 這裡請依照貴單位的實際編制進行修改，畫面上會自動補上「分隊」兩字
         };
 
         function setupRadioGroup(groupId, callback) {
@@ -652,7 +664,8 @@ service firebase.storage {
                 for (let b in fireData) sel.options.add(new Option(b, b));
                 sel.onchange = (e) =&gt; setSquadPref(e.target.value, fireData[e.target.value][0] + "分隊");
             });
-            setSquadPref(localStorage.getItem('last_b') || "第二大隊", localStorage.getItem('last_t') || "新莊分隊");
+            // 下面這行的預設大隊與分隊，也可以修改成貴單位最常用的
+            setSquadPref(localStorage.getItem('last_b') || "第一大隊", localStorage.getItem('last_t') || "中山分隊");
 
             const tAddrSel = document.getElementById('t-addr');
             tAddrSel.innerHTML = ""; 
@@ -784,7 +797,7 @@ service firebase.storage {
             }
         }
 
-        liff.init({ liffId: "2010239154-mvwJXGM7" }).then(() =&gt; { 
+        liff.init({ liffId: "請填入您的LIFF-ID" }).then(() =&gt; { 
             if(!liff.isLoggedIn()) {
                 liff.login(); 
             } else {
@@ -1095,18 +1108,25 @@ service firebase.storage {
             
             const t = document.getElementById('lv-t').value;
             
-            try {
+          try {
+                const depDocRef = doc(db, "fire_deployments", t);
+                const depSnap = await getDoc(depDocRef);
+                if (depSnap.exists()) {
+                    const data = depSnap.data();
+                    if (data.photoUrl) {
+                        const photoRef = ref(storage, data.photoUrl);
+                        await deleteObject(photoRef).catch(e =&gt; console.log("照片可能已刪除", e));
+                    }
+                }
+
                 await setDoc(doc(db, "fire_evacuations", t), { team: t, evacTime: serverTimestamp(), evacBy: { name: userName } });
-                await deleteDoc(doc(db, "fire_deployments", t));
+                await deleteDoc(depDocRef);
                 
                 const flexMsg = {
                     type: "flex", altText: `🚪 ${t} 返隊回報`,
                     contents: {
                         type: "bubble", size: "kilo",
-                        header: { 
-                            type: "box", layout: "vertical", backgroundColor: "#fd7e14", 
-                            contents: [{ type: "text", text: "🚪 單位返隊通知", weight: "bold", color: "#ffffff", size: "md" }] 
-                        },
+                        header: { type: "box", layout: "vertical", backgroundColor: "#fd7e14", contents: [{ type: "text", text: "🚪 單位返隊通知", weight: "bold", color: "#ffffff", size: "md" }] },
                         body: {
                             type: "box", layout: "vertical", spacing: "md",
                             contents: [
@@ -1119,20 +1139,15 @@ service firebase.storage {
                 };
 
                 if(liff.isInClient()) {
-                    liff.sendMessages([flexMsg]).then(() =&gt; { 
-                        showToast("🚪 返隊圖卡已送出！"); 
-                        setTimeout(() =&gt; liff.closeWindow(), 1000); 
-                    });
+                    liff.sendMessages([flexMsg]).then(() =&gt; { showToast("🚪 返隊圖卡已送出！(照片已清除)"); setTimeout(() =&gt; liff.closeWindow(), 1000); });
                 } else { 
-                    showToast("測試環境：資料已更新，圖卡已生成"); 
-                    btn.disabled = false; btn.innerText = "確認分隊返隊"; 
-                    isProcessing = false; 
+                    showToast("測試環境：資料已更新，照片已清除"); 
+                    btn.disabled = false; btn.innerText = "確認分隊返隊"; isProcessing = false; 
                 }
 
             } catch (error) { 
                 showToast("❌ 處理失敗，請檢查網路狀態"); 
-                btn.disabled = false; btn.innerText = "確認分隊返隊"; 
-                isProcessing = false; 
+                btn.disabled = false; btn.innerText = "確認分隊返隊"; isProcessing = false; 
             }
         };
 
@@ -1163,7 +1178,7 @@ service firebase.storage {
                         liff.sendMessages([flexMsg]).then(() =&gt; { showToast("🚩 任務已開啟並發送通知"); setTimeout(() =&gt; liff.closeWindow(), 1000); });
                     } else { showToast("測試環境：任務已開啟"); }
 
-                } catch (error) { showToast("❌ 啟仰任務失敗，請檢查權限"); }
+                } catch (error) { showToast("❌ 啟動任務失敗，請檢查權限"); }
             } else { showToast("⚠️ 請填寫完整資訊"); }
         };
 
@@ -1179,7 +1194,20 @@ service firebase.storage {
 
                 const depSnap = await getDocs(collection(db, "fire_deployments"));
                 let deployments = [];
-                depSnap.forEach(d =&gt; { deployments.push(d.data()); deleteDoc(doc(db, "fire_deployments", d.id)); });
+                const deletePromises = []; 
+
+                depSnap.forEach(d =&gt; { 
+                    const data = d.data();
+                    deployments.push(data); 
+                    
+                    if (data.photoUrl) {
+                        const photoRef = ref(storage, data.photoUrl);
+                        deletePromises.push(deleteObject(photoRef).catch(e =&gt; console.log("照片清除異常", e)));
+                    }
+                    deletePromises.push(deleteDoc(doc(db, "fire_deployments", d.id))); 
+                });
+
+                await Promise.all(deletePromises);
 
                 const evacSnap = await getDocs(collection(db, "fire_evacuations"));
                 evacSnap.forEach(d =&gt; deleteDoc(doc(db, "fire_evacuations", d.id)));
@@ -1197,7 +1225,7 @@ service firebase.storage {
                             contents: [
                                 { type: "box", layout: "horizontal", contents: [{ type: "text", text: "任務類型", color: "#888888", size: "sm", flex: 2 }, { type: "text", text: taskData.type, weight: "bold", size: "sm", color: "#111111", flex: 5 }]},
                                 { type: "box", layout: "horizontal", contents: [{ type: "text", text: "執行地點", color: "#888888", size: "sm", flex: 2 }, { type: "text", text: taskData.address, weight: "bold", size: "sm", color: "#111111", flex: 5 }]},
-                                { type: "box", layout: "horizontal", margin: "md", contents: [{ type: "text", text: "📌 大螢幕看板已清空，戰術資料已封存至歷史紀錄。", color: "#aaaaaa", size: "xs", wrap: true }]}
+                                { type: "box", layout: "horizontal", margin: "md", contents: [{ type: "text", text: "📌 看板已清空，現場照片已自雲端銷毀釋放空間，戰術紀錄已封存。", color: "#aaaaaa", size: "xs", wrap: true }]}
                             ]
                         }
                     }
@@ -1205,9 +1233,14 @@ service firebase.storage {
 
                 if(liff.isInClient()) {
                     liff.sendMessages([flexMsg]).then(() =&gt; { showToast("✅ 已歸檔並發送通知"); setTimeout(() =&gt; liff.closeWindow(), 1500); });
-                } else { showToast("測試環境：已歸檔並清空"); btn.innerText = "完成"; }
+                } else { showToast("測試環境：已歸檔、照片已清空"); btn.innerText = "完成"; }
 
-            } catch (error) { showToast("❌ 結案失敗，請檢查網路"); console.error(error); btn.disabled = false; btn.innerText = "✅ 結束任務結案存檔"; }
+            } catch (error) { 
+                showToast("❌ 結案失敗，請檢查網路"); 
+                console.error(error); 
+                btn.disabled = false; 
+                btn.innerText = "✅ 結束任務結案存檔"; 
+            }
         };
 
         document.getElementById('go-add-admin').onclick = async () =&gt; {
@@ -1222,6 +1255,65 @@ service firebase.storage {
             const uid = uidInput.value.trim();
             if (!uid || !uid.startsWith("U") || uid.length !== 33) return showToast("⚠️ 請選擇成員");
             try { await deleteDoc(doc(db, "authorized_admins", uid)); showToast("🚪 已移除該員管理權限"); } catch (error) { showToast("❌ 移除失敗"); }
+        };
+
+        document.getElementById('btn-share-system').onclick = async () =&gt; {
+            if (!liff.isApiAvailable('shareTargetPicker')) {
+                return showToast("⚠️ 請先至 LINE 開發者後台開啟 Share Target Picker 功能！");
+            }
+
+            try {
+                const flexMessage = {
+                    type: "flex",
+                    altText: "🚒 戰術指揮與安全管制系統",
+                    contents: {
+                        type: "bubble",
+                        hero: {
+                            type: "image",
+                            url: "https://images.unsplash.com/photo-1583524505974-6facd53f4597?auto=format&fit=crop&w=800&q=80", 
+                            size: "full",
+                            aspectRatio: "20:13",
+                            aspectMode: "cover"
+                        },
+                        body: {
+                            type: "box",
+                            layout: "vertical",
+                            contents: [
+                                { type: "text", text: "戰術指揮與安全管制", weight: "bold", size: "xl", color: "#111111" },
+                                { type: "text", text: "點擊下方按鈕進入系統，進行兵力部署回報與撤離管制。", size: "sm", color: "#888888", wrap: true, margin: "md" }
+                            ]
+                        },
+                        footer: {
+                            type: "box",
+                            layout: "vertical",
+                            spacing: "sm",
+                            contents: [
+                                {
+                                    type: "button",
+                                    style: "primary",
+                                    height: "sm",
+                                    color: "#d90429", 
+                                    action: {
+                                        type: "uri",
+                                        label: "🚀 點此開啟系統看板", 
+                                        uri: "https://liff.line.me/請填入您的LIFF-ID" 
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                };
+
+                const res = await liff.shareTargetPicker([flexMessage]);
+                if (res) {
+                    showToast("✅ 圖文小卡已成功發送至群組！");
+                } else {
+                    showToast("已取消發送");
+                }
+            } catch (error) {
+                console.error(error);
+                showToast("❌ 發送失敗，請檢查權限設定");
+            }
         };
 
         function send(txt, successMsg) {
