@@ -553,13 +553,16 @@ service firebase.storage {
                     &lt;button class="btn btn-primary" id="go-add-admin" style="margin-top: 0; background-color: var(--line-green);"&gt;➕ 授權管理員&lt;/button&gt;
                     &lt;button class="btn btn-end" id="go-remove-admin" style="margin-top: 0; border: 2px solid var(--emergency-red); color: var(--emergency-red); background-color: transparent;"&gt;❌ 移除權限&lt;/button&gt;
                 &lt;/div&gt;
-            &lt;/div&gt;
-            &lt;!-- 容器結束 --&gt;
-
+                
+            &lt;!-- 👇 加入這段分享按鈕 👇 --&gt;
             &lt;div class="section-title" style="margin-top: 24px;"&gt;系統分享與邀請&lt;/div&gt;
             &lt;div class="card" style="background: transparent; box-shadow: none; padding: 0;"&gt;
                 &lt;button class="btn" id="btn-share-system" style="background-color: #023e8a; color: #fff; margin-top: 0;"&gt;📢 發送系統圖文小卡到群組&lt;/button&gt;
             &lt;/div&gt;
+            &lt;!-- 👆 加入這段分享按鈕 👆 --&gt;
+            &lt;/div&gt;
+            &lt;!-- 容器結束 --&gt;
+
 
         &lt;/div&gt;
     &lt;/div&gt;
@@ -624,8 +627,8 @@ service firebase.storage {
         const storage = getStorage(app);
 
         let userName = "未知人員"; 
-        let currentUserId = null; 
-        let isAdmin = false;      
+        let currentUserId = null; // 新增：記錄當前使用者的 ID
+        let isAdmin = false;      // 新增：記錄當前使用者是否為管理員
         let toastTimeout;
 
         function showToast(msg) {
@@ -639,9 +642,14 @@ service firebase.storage {
         };
 
         const fireData = {
-            "第一大隊": ["中山", "中正", "信義"],
-            "第二大隊": ["大安", "松山"]
-            // 這裡請依照貴單位的實際編制進行修改，畫面上會自動補上「分隊」兩字
+            "第一大隊": ["莒光", "新板", "板橋", "大觀", "海山", "民生", "溪崑"],
+            "第二大隊": ["五工", "裕民", "福營", "新莊", "中港", "頭前", "五股", "更寮", "泰山", "林口", "文化"],
+            "第三大隊": ["三重", "鷺江", "蘆洲", "重陽", "二重", "八里", "龍源", "淡水", "竹圍", "三芝", "滬尾"],
+            "第四大隊": ["深坑", "新店", "直潭", "安康", "安和", "石碇", "坪林", "雪山", "烏來"],
+            "第五大隊": ["三峽", "隆恩", "土城", "清水", "頂埔", "樹林", "樹潭", "柑園", "鶯歌", "鳳鳴"],
+            "第六大隊": ["社后", "汐止", "長青", "橫科", "瑞芳", "瑞亭", "九份", "金山", "石門", "萬里", "雙溪", "貢寮", "平溪"],
+            "第七大隊": ["永和", "永利", "永平", "中和", "員山", "南勢", "國光", "秀山"],
+            "特搜大隊": ["南雅", "慈福", "德音", "秀峰", "大埔"]
         };
 
         function setupRadioGroup(groupId, callback) {
@@ -658,17 +666,18 @@ service firebase.storage {
         }
 
        function initUI() {
+            // 處理部署與返隊的大隊選單
             ['dep-b', 'lv-b'].forEach(id =&gt; {
                 const sel = document.getElementById(id);
-                sel.innerHTML = ""; 
+                sel.innerHTML = ""; // 🌟 新增這行：先清空選項，防止重複疊加
                 for (let b in fireData) sel.options.add(new Option(b, b));
                 sel.onchange = (e) =&gt; setSquadPref(e.target.value, fireData[e.target.value][0] + "分隊");
             });
-            // 下面這行的預設大隊與分隊，也可以修改成貴單位最常用的
-            setSquadPref(localStorage.getItem('last_b') || "第一大隊", localStorage.getItem('last_t') || "中山分隊");
+            setSquadPref(localStorage.getItem('last_b') || "第二大隊", localStorage.getItem('last_t') || "新莊分隊");
 
+            // 處理開啟新任務的大隊選單
             const tAddrSel = document.getElementById('t-addr');
-            tAddrSel.innerHTML = ""; 
+            tAddrSel.innerHTML = ""; // 🌟 新增這行：先清空選項，防止重複疊加
             for (let b in fireData) { tAddrSel.options.add(new Option(b, b)); }
             
             setupRadioGroup('p-group', (val) =&gt; {
@@ -732,6 +741,7 @@ service firebase.storage {
       const userSelect = document.getElementById('admin-user-select');
         const uidInput = document.getElementById('admin-uid-input');
 
+        // ================= 1. 監聽全體人員名單 =================
         onSnapshot(query(collection(db, "line_users"), where("status", "==", "active")), (snapshot) =&gt; {
             userSelect.innerHTML = '&lt;option value=""&gt;-- 請選擇成員 --&lt;/option&gt;';
             userMap = {};
@@ -746,9 +756,10 @@ service firebase.storage {
         }, (error) =&gt; {
             console.log("無權限讀取成員名單 (一般使用者正常現象)");
             userSelect.innerHTML = '&lt;option value=""&gt;-- 僅管理員可查看名單 --&lt;/option&gt;';
-            renderAdminList(); 
+            renderAdminList(); // 就算沒權限讀取，也要執行以消除「載入中」的文字
         });
 
+        // ================= 2. 監聽管理員名單 =================
         onSnapshot(collection(db, "authorized_admins"), (snapshot) =&gt; {
             adminIds = [];
             snapshot.forEach((doc) =&gt; { adminIds.push(doc.id); });
@@ -756,17 +767,21 @@ service firebase.storage {
             checkAdminStatus(); 
         });
 
+        // ================= 3. 【這就是你遺失的函數】負責把名單畫到畫面上 =================
         function renderAdminList() {
             const container = document.getElementById('authorized-admins-list');
             if (!container) return;
 
+            // 如果目前沒有任何管理員
             if (adminIds.length === 0) {
                 container.innerHTML = '&lt;span style="color: var(--warning-orange); font-size: 14px;"&gt;⚠️ 目前暫無動態授權管理員&lt;/span&gt;';
                 return;
             }
 
+            // 如果有管理員，清空並產生標籤
             container.innerHTML = "";
             adminIds.forEach((id) =&gt; {
+                // 如果權限不夠讀不到 userMap 的名字，就顯示 ID 前 6 碼
                 const name = userMap[id] || `管理人員 (${id.substring(0, 6)}...)`;
                 const span = document.createElement('span');
                 span.style.cssText = "display: inline-block; background: #e2f0d9; color: #385723; padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: bold;";
@@ -775,20 +790,24 @@ service firebase.storage {
             });
         }
 
+        // ================= 4. 檢查當前操作者的權限 =================
         function checkAdminStatus() {
             if (!currentUserId) return; 
             
             isAdmin = adminIds.includes(currentUserId);
             
             const endBtn = document.getElementById('go-end');
-            const adminBlock = document.getElementById('admin-management-block'); 
+            const adminBlock = document.getElementById('admin-management-block'); // 取得管理員區塊
 
             if (isAdmin) {
+                // ✅ 是管理員：開放結束按鈕，並【顯示管理員設定區塊】
                 if(endBtn) { endBtn.disabled = false; endBtn.innerText = "✅ 結束任務結案存檔"; endBtn.style.opacity = "1"; }
                 if(adminBlock) { adminBlock.style.display = "block"; } 
             } else {
+                // 🚫 非管理員：鎖定按鈕，並【隱藏管理員設定區塊】
                 if(endBtn) { endBtn.disabled = true; endBtn.innerText = "🚫 僅管理員可結束任務"; endBtn.style.opacity = "0.4"; }
                 
+                // 防呆：如果系統裡完全沒有半個管理員，破例打開區塊讓第一個人能設定自己
                 if (adminIds.length === 0) {
                     if(adminBlock) { adminBlock.style.display = "block"; }
                 } else {
@@ -797,14 +816,15 @@ service firebase.storage {
             }
         }
 
+        // ======= 3. 找到原有的 liff.init 區塊並替換 =======
         liff.init({ liffId: "請填入您的LIFF-ID" }).then(() =&gt; { 
             if(!liff.isLoggedIn()) {
                 liff.login(); 
             } else {
                 liff.getProfile().then(async (profile) =&gt; { 
                     userName = profile.displayName; 
-                    currentUserId = profile.userId; 
-                    checkAdminStatus(); 
+                    currentUserId = profile.userId; // 儲存當前 User ID
+                    checkAdminStatus(); // 登入後立刻檢查一次權限
 
                     try {
                         await setDoc(doc(db, "line_users", profile.userId), { userId: profile.userId, name: profile.displayName, status: "active", lastLogin: serverTimestamp() }, { merge: true });
@@ -820,6 +840,7 @@ service firebase.storage {
         let isProcessing = false; 
         let hasActiveTask = false;
 
+        // ================= 戰術圖資看板 時間更新 =================
         setInterval(() =&gt; {
             const now = new Date();
             const y = now.getFullYear(); const m = String(now.getMonth() + 1).padStart(2, '0'); const d = String(now.getDate()).padStart(2, '0');
@@ -828,6 +849,7 @@ service firebase.storage {
             document.getElementById('live-clock').innerText = now.toLocaleTimeString('zh-TW', { hour12: false });
         }, 1000);
 
+        // ================= 監聽任務狀態 =================
         onSnapshot(doc(db, "system_state", "current_task"), (snap) =&gt; {
             if (isProcessing) return; 
 
@@ -840,6 +862,7 @@ service firebase.storage {
                 hasActiveTask = true; 
                 document.getElementById('task-text').innerText = `${snap.data().type} / ${snap.data().address}`;
                 
+                // 更新戰術看板標題
                 document.getElementById('task-type').innerText = snap.data().type;
                 document.getElementById('task-address').innerText = snap.data().address;
                 
@@ -861,6 +884,7 @@ service firebase.storage {
             }
         });
 
+        // ================= 解析戰術看版的水線與卡片生成 =================
         function extractWaterLines(data) {
             if (!data) return 0;
             let allText = Object.values(data).filter(val =&gt; typeof val === 'string' || typeof val === 'number').join(" ");
@@ -913,6 +937,7 @@ service firebase.storage {
             return '1';
         }
 
+        // ================= 戰術看板：即時兵力部署 =================
         onSnapshot(collection(db, "fire_deployments"), (snap) =&gt; {
             const counts = { '1':0, '2':0, '3':0, '4':0, 'center':0, 'standby':0 };
             const squadCounts = { '1':0, '2':0, '3':0, '4':0, 'center':0, 'standby':0 }; 
@@ -962,6 +987,7 @@ service firebase.storage {
             }
         });
 
+       // ================= 戰術看板：返隊待命與歷史 =================
         onSnapshot(collection(db, "fire_evacuations"), (snap) =&gt; {
             const container = document.getElementById('evac-container');
             const btn = document.getElementById('evac-btn');
@@ -971,6 +997,7 @@ service firebase.storage {
                 const time = data.evacTime ? data.evacTime.toDate().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : "--:--";
                 const evacBy = (data.evacBy && data.evacBy.name) ? data.evacBy.name : "未知";
                 
+                // 【修正】：判斷如果有存人數才顯示括號，如果沒有(撤離通常沒有)就不顯示
                 const pStr = data.people ? ` (${data.people})` : ""; 
                 
                 container.innerHTML += `&lt;div class="log-item" style="border-left: 3px solid var(--evac-orange); padding-left: 8px;"&gt;&lt;span&gt;&lt;b style="color:#fff;"&gt;${data.team}&lt;/b&gt;${pStr}&lt;/span&gt;&lt;span style="font-size: 11px; color: #888;"&gt;👤${evacBy} | 返隊於 ${time}&lt;/span&gt;&lt;/div&gt;`;
@@ -1035,6 +1062,31 @@ service firebase.storage {
         });
 
 
+        // 初始化 LIFF
+        liff.init({ liffId: "請填入您的LIFF-ID" }).then(() =&gt; { 
+            if(!liff.isLoggedIn()) {
+                liff.login(); 
+            } else {
+                liff.getProfile().then(async (profile) =&gt; { 
+                    userName = profile.displayName; 
+                    try {
+                        await setDoc(doc(db, "line_users", profile.userId), { userId: profile.userId, name: profile.displayName, status: "active", lastLogin: serverTimestamp() }, { merge: true });
+                    } catch (error) { console.error(error); }
+                }).catch(err =&gt; console.error(err));
+                initUI(); 
+            }
+        });
+
+        // 綁定上方導航列滑動事件
+        const container = document.getElementById('swipe-container');
+        const btns = document.querySelectorAll('.tab-btn');
+        btns.forEach(b =&gt; b.onclick = () =&gt; container.scrollTo({ left: container.clientWidth * parseInt(b.dataset.idx), behavior: 'smooth' }));
+        container.onscroll = () =&gt; {
+            const idx = Math.round(container.scrollLeft / container.clientWidth);
+            btns.forEach((b, i) =&gt; b.classList.toggle('active', i === idx));
+        };
+
+        // ================= 核心操作邏輯 =================
         document.getElementById('go-deploy').onclick = async () =&gt; {
             if (!hasActiveTask) return showToast("⚠️ 請先至管理頁面開啟新任務！"); 
             const btn = document.getElementById('go-deploy');
@@ -1109,19 +1161,23 @@ service firebase.storage {
             const t = document.getElementById('lv-t').value;
             
           try {
+                // 1. 先去抓該單位的部署資料，看有沒有照片
                 const depDocRef = doc(db, "fire_deployments", t);
                 const depSnap = await getDoc(depDocRef);
                 if (depSnap.exists()) {
                     const data = depSnap.data();
+                    // 如果有照片網址，就從 Storage 徹底刪除實體檔案
                     if (data.photoUrl) {
                         const photoRef = ref(storage, data.photoUrl);
                         await deleteObject(photoRef).catch(e =&gt; console.log("照片可能已刪除", e));
                     }
                 }
 
+                // 2. 更新 Firebase 資料庫 (記錄返隊、刪除部署)
                 await setDoc(doc(db, "fire_evacuations", t), { team: t, evacTime: serverTimestamp(), evacBy: { name: userName } });
                 await deleteDoc(depDocRef);
                 
+                // 組合 Flex Message 圖卡 (橘色警示風格)
                 const flexMsg = {
                     type: "flex", altText: `🚪 ${t} 返隊回報`,
                     contents: {
@@ -1138,6 +1194,7 @@ service firebase.storage {
                     }
                 };
 
+                // 送出訊息並關閉視窗
                 if(liff.isInClient()) {
                     liff.sendMessages([flexMsg]).then(() =&gt; { showToast("🚪 返隊圖卡已送出！(照片已清除)"); setTimeout(() =&gt; liff.closeWindow(), 1000); });
                 } else { 
@@ -1183,7 +1240,7 @@ service firebase.storage {
         };
 
         document.getElementById('go-end').onclick = async () =&gt; {
-            if (!isAdmin) return showToast("⚠️ 權限不足：僅授權管理員可結束任務！"); 
+            if (!isAdmin) return showToast("⚠️ 權限不足：僅授權管理員可結束任務！"); // 雙重防護
             const btn = document.getElementById('go-end');
             btn.disabled = true; btn.innerText = "⏳ 結案歸檔清空中...";
 
@@ -1192,26 +1249,31 @@ service firebase.storage {
                 if (!taskSnap.exists()) { showToast("目前沒有任務"); btn.disabled = false; btn.innerText = "✅ 結束任務結案存檔"; return; }
                 const taskData = taskSnap.data();
 
+                // 1. 抓取所有還在部署中的單位資料
                 const depSnap = await getDocs(collection(db, "fire_deployments"));
                 let deployments = [];
-                const deletePromises = []; 
+                const deletePromises = []; // 用來裝所有要刪除的任務(包含照片與資料)
 
                 depSnap.forEach(d =&gt; { 
                     const data = d.data();
                     deployments.push(data); 
                     
+                    // 如果這個單位有傳照片，把刪除照片的指令加入排程
                     if (data.photoUrl) {
                         const photoRef = ref(storage, data.photoUrl);
                         deletePromises.push(deleteObject(photoRef).catch(e =&gt; console.log("照片清除異常", e)));
                     }
+                    // 把刪除部署資料的指令加入排程
                     deletePromises.push(deleteDoc(doc(db, "fire_deployments", d.id))); 
                 });
 
+                // 2. 一口氣執行所有刪除作業 (資料 + 照片)
                 await Promise.all(deletePromises);
 
                 const evacSnap = await getDocs(collection(db, "fire_evacuations"));
                 evacSnap.forEach(d =&gt; deleteDoc(doc(db, "fire_evacuations", d.id)));
 
+                // 3. 寫入歷史紀錄並清除當前任務狀態
                 await addDoc(collection(db, "history_logs"), { type: taskData.type, address: taskData.address, startTime: taskData.startTime, endTime: serverTimestamp(), deployments: deployments });
                 await deleteDoc(doc(db, "system_state", "current_task"));
 
@@ -1235,14 +1297,8 @@ service firebase.storage {
                     liff.sendMessages([flexMsg]).then(() =&gt; { showToast("✅ 已歸檔並發送通知"); setTimeout(() =&gt; liff.closeWindow(), 1500); });
                 } else { showToast("測試環境：已歸檔、照片已清空"); btn.innerText = "完成"; }
 
-            } catch (error) { 
-                showToast("❌ 結案失敗，請檢查網路"); 
-                console.error(error); 
-                btn.disabled = false; 
-                btn.innerText = "✅ 結束任務結案存檔"; 
-            }
-        };
-
+            } catch (error) { showToast("❌ 結案失敗，請檢查網路"); console.error(error); btn.disabled = false; btn.innerText = "✅ 結束任務結案存檔"; }
+};
         document.getElementById('go-add-admin').onclick = async () =&gt; {
             if (!isAdmin && adminIds.length &gt; 0) return showToast("⚠️ 權限不足：您不是管理員！");
             const uid = uidInput.value.trim();
@@ -1250,27 +1306,34 @@ service firebase.storage {
             try { await setDoc(doc(db, "authorized_admins", uid), { addedBy: userName, addTime: serverTimestamp() }); showToast("✅ 已成功授權為管理員"); } catch (error) { showToast("❌ 授權失敗"); }
         };
 
+        // 移除管理員按鈕
         document.getElementById('go-remove-admin').onclick = async () =&gt; {
             if (!isAdmin) return showToast("⚠️ 權限不足：您不是管理員！");
             const uid = uidInput.value.trim();
             if (!uid || !uid.startsWith("U") || uid.length !== 33) return showToast("⚠️ 請選擇成員");
             try { await deleteDoc(doc(db, "authorized_admins", uid)); showToast("🚪 已移除該員管理權限"); } catch (error) { showToast("❌ 移除失敗"); }
         };
+// 👇 加入這段發送圖文小卡的程式碼 👇
+       // 👇 加入這段發送圖文小卡的程式碼 👇
+       document.getElementById('btn-share-system').onclick = async () =&gt; {
+            // 🌟 雙重防護：如果不是管理員，直接擋下並跳出警告
+            if (!isAdmin) return showToast("⚠️ 權限不足：僅授權管理員可發送圖卡！"); 
 
-        document.getElementById('btn-share-system').onclick = async () =&gt; {
+            // 檢查開發者後台是否有開啟 Share Target Picker
             if (!liff.isApiAvailable('shareTargetPicker')) {
                 return showToast("⚠️ 請先至 LINE 開發者後台開啟 Share Target Picker 功能！");
             }
 
             try {
+                // 這裡設計你的圖文小卡
                 const flexMessage = {
                     type: "flex",
-                    altText: "🚒 戰術指揮與安全管制系統",
+                    altText: "🚒 工廠火災安全管理小幫手",
                     contents: {
                         type: "bubble",
                         hero: {
                             type: "image",
-                            url: "https://images.unsplash.com/photo-1583524505974-6facd53f4597?auto=format&fit=crop&w=800&q=80", 
+                            url: "https://i.ibb.co/8gNWWyN9/Group-of-firefighters-scaled-1.jpg", 
                             size: "full",
                             aspectRatio: "20:13",
                             aspectMode: "cover"
@@ -1279,8 +1342,8 @@ service firebase.storage {
                             type: "box",
                             layout: "vertical",
                             contents: [
-                                { type: "text", text: "戰術指揮與安全管制", weight: "bold", size: "xl", color: "#111111" },
-                                { type: "text", text: "點擊下方按鈕進入系統，進行兵力部署回報與撤離管制。", size: "sm", color: "#888888", wrap: true, margin: "md" }
+                                { type: "text", text: "🚒 工廠火災安全管理小幫手", weight: "bold", size: "xl", color: "#111111" },
+                                { type: "text", text: "點擊下方按鈕進入系統，進行人力部署回報與撤離管制。", size: "sm", color: "#888888", wrap: true, margin: "md" }
                             ]
                         },
                         footer: {
@@ -1295,7 +1358,7 @@ service firebase.storage {
                                     color: "#d90429", 
                                     action: {
                                         type: "uri",
-                                        label: "🚀 點此開啟系統看板", 
+                                        label: "🚀 點此開啟系統看板", // 🌟 這裡的引號錯誤修復了！
                                         uri: "https://liff.line.me/請填入您的LIFF-ID" 
                                     }
                                 }
@@ -1304,6 +1367,7 @@ service firebase.storage {
                     }
                 };
 
+                // 喚起選擇群組的畫面
                 const res = await liff.shareTargetPicker([flexMessage]);
                 if (res) {
                     showToast("✅ 圖文小卡已成功發送至群組！");
@@ -1315,6 +1379,7 @@ service firebase.storage {
                 showToast("❌ 發送失敗，請檢查權限設定");
             }
         };
+        // 👆 加入這段發送圖文小卡的程式碼 👆
 
         function send(txt, successMsg) {
             if(liff.isInClient()) { liff.sendMessages([{type:'text', text:txt}]).then(() =&gt; { showToast(successMsg); setTimeout(() =&gt; liff.closeWindow(), 1000); });
